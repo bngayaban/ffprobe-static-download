@@ -1,0 +1,29 @@
+{
+  "name": "ffprobe-static2",
+  "version": "1.0.0",
+  "description": "Downloads static binaries for ffprobe",
+  "main": "index.js",
+  "dependencies": {
+    "axios": "^0.19.2",
+    "decompress-tarxz": "^3.0.0",
+    "extract-zip": "^2.0.1",
+    "mvdir": "^1.0.17"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bngayaban/ffprobe-static2.git"
+  },
+  "keywords": [
+    "ffprobe"
+  ],
+  "author": "Bryan Gayaban",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/bngayaban/ffprobe-static2/issues"
+  },
+  "homepage": "https://github.com/bngayaban/ffprobe-static2#readme"
+}
