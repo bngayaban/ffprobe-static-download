@@ -2,7 +2,9 @@ const axios = require('axios');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const zip = require('extract-zip');
+const tarxz = require('decompress-tarxz');
+const unzip = require('decompress-unzip');
+const decompress = require('decompress');
 const mvdir = require('mvdir');
 
 
@@ -10,20 +12,23 @@ const platform = os.platform();
 const arch = os.arch();
 
 
-const binPath = path.join(__dirname, 'bin', platform, arch, 'ffprobeBinary.compressed');
-const binDirectory =  path.join(__dirname, 'bin', platform, arch);
+const archivePath = path.join(__dirname, 'bin', platform, arch, 'ffprobeArchive');
+const platformPath = path.join(__dirname, 'bin', platform, arch);
 
 const url = generateUrl(platform, arch);
 
 (async() => {
     try {
-        await Download(url, binPath);
+        await download(url, archivePath);
         console.log('Done downloading.')
-        await Extract(binPath, binDirectory);
+        
+        const ffprobeArchivePath = await extract(archivePath, platformPath);
         console.log('Done extracting.');
-        await moveBinary(binDirectory);
+        
+        await moveBinary(ffprobeArchivePath, platformPath);
         console.log('Moved binary');
-        //await cleanUp(binDirectory);
+        
+        await cleanUp(ffprobeArchivePath, platformPath);
         console.log('Done Cleaning');
     } catch (e) {
         console.error(e);
@@ -53,7 +58,8 @@ function generateUrl(platform, arch) {
     return supportedPlatforms[platform][arch] || 'Not Supported';
 }
 
-async function Download(url, filePath) {
+// downloads the compressed folder into the respective platform/arch directory
+async function download(url, filePath) {
     const writer = fs.createWriteStream(filePath);
     const response = await axios({
         url,
@@ -68,17 +74,26 @@ async function Download(url, filePath) {
     })
 }
 
-async function Extract(source, destination) {
-    try{
-        await zip(source, {dir: destination});
-    } catch(e) {
+// extracts and returns the file path for the ffprobe binary
+async function extract(source, destination) {
+    let files;
+    try {
+        files = await decompress(source, destination, {
+            plugins: [
+                (platform === 'linux') ? tarxz() : unzip()
+            ],
+            filter: file => path.basename(file.path, '.exe') === 'ffprobe'
+        })
+    } catch (e) {
         console.log(e);
     }
+
+    return files[0].path;
 }
 
-async function moveBinary(destination) {
-    const source = path.join(destination, 'ffmpeg-latest-win64-static', 'bin', 'ffprobe.exe');
-    console.log(source)
+//moves ffprobe to the head of its respective directory
+async function moveBinary(ffprobeArchivePath, destination) {
+    const source = path.join(destination, ffprobeArchivePath);
     try {
         await mvdir(source, destination)
     } catch (e) {
@@ -86,9 +101,28 @@ async function moveBinary(destination) {
     }
 }
 
-async function cleanUp(directory){
-    const zip = path.join(directory, 'ffprobeBinary.compressed');
-    const folder = path.join(directory, 'ffmpeg-latest-win64-static');
+// deletes the downloaded tar/zip file and the uncompressed contents
+async function cleanUp(ffprobeArchivePath, directory){
+    const zip = path.join(directory, 'ffprobeArchive');
+    const folder = path.join(directory, getHeadDirectory(ffprobeArchivePath));
     fs.unlinkSync(zip);
     fs.rmdirSync(folder, {recursive: true});
+
+    //sometimes the binary is 2+ folders down so we need to get upper most directory
+    function getHeadDirectory(ffPath) {
+        let prev = ffPath;
+        let itr = 0
+        while(ffPath !== '.') {
+            prev = ffPath;
+            ffPath = path.dirname(ffPath);
+        }
+        return prev;
+    }
 }
+
+const ffprobeDlPath = path.join(
+    platformPath, 
+    platform === 'win32' ? 'ffprobe.exe' : 'ffprobe'
+);
+
+exports.path = ffprobeDlPath; 
