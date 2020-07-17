@@ -9,22 +9,21 @@ const mvdir = require('mvdir');
 const platform = os.platform();
 const arch = os.arch();
 
-const link = 'https://ffmpeg.zeranoe.com/builds/win64/static/ffmpeg-latest-win64-static.zip'
 
-
-const binPath = path.join(__dirname, 'bin', platform, arch, 'ffmpeg-latest-win64-static.zip');
+const binPath = path.join(__dirname, 'bin', platform, arch, 'ffprobeBinary.compressed');
 const binDirectory =  path.join(__dirname, 'bin', platform, arch);
 
-console.log(binPath);
+const url = generateUrl(platform, arch);
+
 (async() => {
     try {
-        await Download(link, binPath);
+        await Download(url, binPath);
         console.log('Done downloading.')
-        await Extract(binPath, path.dirname(binPath));
+        await Extract(binPath, binDirectory);
         console.log('Done extracting.');
         await moveBinary(binDirectory);
         console.log('Moved binary');
-        await cleanUp(binDirectory);
+        //await cleanUp(binDirectory);
         console.log('Done Cleaning');
     } catch (e) {
         console.error(e);
@@ -33,6 +32,26 @@ console.log(binPath);
     }
     
 })();
+
+function generateUrl(platform, arch) {
+    const supportedPlatforms = {
+        win32: {
+            x64: 'https://ffmpeg.zeranoe.com/builds/win64/static/ffmpeg-latest-win64-static.zip',
+            ia32: 'https://ffmpeg.zeranoe.com/builds/win32/static/ffmpeg-latest-win32-static.zip'
+        },
+        linux: {
+            arm: 'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-armhf-static.tar.xz',
+            arm64: 'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-arm64-static.tar.xz',
+            ia32: 'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-i686-static.tar.xz',
+            x64: 'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz',
+        },
+        darwin : {
+            x64: 'https://evermeet.cx/ffmpeg/get/zip',
+        }
+    }
+
+    return supportedPlatforms[platform][arch] || 'Not Supported';
+}
 
 async function Download(url, filePath) {
     const writer = fs.createWriteStream(filePath);
@@ -49,9 +68,9 @@ async function Download(url, filePath) {
     })
 }
 
-async function Extract(source, output) {
+async function Extract(source, destination) {
     try{
-        await zip(source, {dir: output});
+        await zip(source, {dir: destination});
     } catch(e) {
         console.log(e);
     }
@@ -68,7 +87,7 @@ async function moveBinary(destination) {
 }
 
 async function cleanUp(directory){
-    const zip = path.join(directory, 'ffmpeg-latest-win64-static.zip');
+    const zip = path.join(directory, 'ffprobeBinary.compressed');
     const folder = path.join(directory, 'ffmpeg-latest-win64-static');
     fs.unlinkSync(zip);
     fs.rmdirSync(folder, {recursive: true});
