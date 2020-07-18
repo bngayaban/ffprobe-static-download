@@ -18,6 +18,11 @@ const platformPath = path.join(__dirname, 'bin', platform, arch);
 const url = generateUrl(platform, arch);
 
 (async() => {
+    if(url === 'Not Supported') {
+        console.log('Unsupported platform and architecture:', platform, arch);
+        process.exit();
+    }
+
     try {
         await download(url, archivePath);
         console.log('Done downloading.')
@@ -55,7 +60,7 @@ function generateUrl(platform, arch) {
         }
     }
 
-    return supportedPlatforms[platform][arch] || 'Not Supported';
+    return supportedPlatforms[platform] && supportedPlatforms[platform][arch] || 'Not Supported';
 }
 
 // downloads the compressed folder into the respective platform/arch directory
