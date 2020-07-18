@@ -7,17 +7,20 @@ const unzip = require('decompress-unzip');
 const decompress = require('decompress');
 const mvdir = require('mvdir');
 
-
 const platform = os.platform();
 const arch = os.arch();
 
-
-const archivePath = path.join(__dirname, 'bin', platform, arch, 'ffprobeArchive');
 const platformPath = path.join(__dirname, 'bin', platform, arch);
 
-const url = generateUrl(platform, arch);
-
 (async() => {
+
+    if(require.main !== module) {
+        return;
+    }
+
+    const archivePath = path.join(platformPath, 'ffprobeArchive');
+    const url = generateUrl(platform, arch);
+
     if(url === 'Not Supported') {
         console.log('Unsupported platform and architecture:', platform, arch);
         process.exit();
