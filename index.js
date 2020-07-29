@@ -9,28 +9,32 @@ const mvdir = require('mvdir');
 
 const platform = os.platform();
 const arch = os.arch();
-
 const platformPath = path.join(__dirname, 'bin', platform, arch);
 
-(async() => {
-
+//check for post install and platform support
+(async () => {
     if(require.main !== module) {
         return;
     }
 
-    const archivePath = path.join(platformPath, 'ffprobeArchive');
-    const url = generateUrl(platform, arch);
-
-    if(url === 'Not Supported') {
+    if(getUrl(platform, arch) === 'Not Supported') {
         console.log('Unsupported platform and architecture:', platform, arch);
         process.exit();
     }
 
+    await getFFProbe(platform, arch);
+})(platform, arch);
+
+// installs the appropriate ffprobe
+async function getFFProbe(platform, arch) {
+    const archivePath = path.join(platformPath, 'ffprobeArchive');
+    const url = getUrl(platform, arch);
+
     try {
-        await download(url, archivePath);
+        await downloadArchive(url, archivePath);
         console.log('Done downloading.')
         
-        const ffprobeArchivePath = await extract(archivePath, platformPath);
+        const ffprobeArchivePath = await extractArchive(archivePath, platformPath, platform);
         console.log('Done extracting.');
         
         await moveBinary(ffprobeArchivePath, platformPath);
@@ -43,31 +47,31 @@ const platformPath = path.join(__dirname, 'bin', platform, arch);
         console.log(e);
         process.exit();
     }
-    
-})();
+}
 
-function generateUrl(platform, arch) {
+// return the appropriate url for the platform/arch or not supported if not found
+function getUrl(platform, arch) {
     const supportedPlatforms = {
         win32: {
-            x64: 'https://ffmpeg.zeranoe.com/builds/win64/static/ffmpeg-latest-win64-static.zip',
-            ia32: 'https://ffmpeg.zeranoe.com/builds/win32/static/ffmpeg-latest-win32-static.zip'
+            x64: 'https://ffmpeg.zeranoe.com/builds/win64/static/ffmpeg-4.3-win64-static.zip',//'https://ffmpeg.zeranoe.com/builds/win64/static/ffmpeg-latest-win64-static.zip',
+            ia32: 'https://ffmpeg.zeranoe.com/builds/win32/static/ffmpeg-4.3-win32-static.zip'//'https://ffmpeg.zeranoe.com/builds/win32/static/ffmpeg-latest-win32-static.zip'
         },
         linux: {
-            arm: 'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-armhf-static.tar.xz',
-            arm64: 'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-arm64-static.tar.xz',
-            ia32: 'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-i686-static.tar.xz',
-            x64: 'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz',
+            arm: 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-armhf-static.tar.xz',//'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-armhf-static.tar.xz',
+            arm64: 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-arm64-static.tar.xz',//'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-arm64-static.tar.xz',
+            ia32: 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-i686-static.tar.xz',//'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-i686-static.tar.xz',
+            x64: 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz'//'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz',
         },
         darwin : {
-            x64: 'https://evermeet.cx/ffmpeg/get/zip',
+            x64: 'https://evermeet.cx/ffmpeg/ffprobe-4.3.1.zip',//'https://evermeet.cx/ffmpeg/get/zip',
         }
-    }
+    };
 
     return supportedPlatforms[platform] && supportedPlatforms[platform][arch] || 'Not Supported';
 }
 
 // downloads the compressed folder into the respective platform/arch directory
-async function download(url, filePath) {
+async function downloadArchive(url, filePath) {
     const writer = fs.createWriteStream(filePath);
     const response = await axios({
         url,
@@ -83,7 +87,7 @@ async function download(url, filePath) {
 }
 
 // extracts and returns the file path for the ffprobe binary
-async function extract(source, destination) {
+async function extractArchive(source, destination, platform) {
     let files;
     try {
         files = await decompress(source, destination, {
@@ -102,6 +106,7 @@ async function extract(source, destination) {
 //moves ffprobe to the head of its respective directory
 async function moveBinary(ffprobeArchivePath, destination) {
     const source = path.join(destination, ffprobeArchivePath);
+
     try {
         await mvdir(source, destination)
     } catch (e) {
@@ -113,13 +118,18 @@ async function moveBinary(ffprobeArchivePath, destination) {
 async function cleanUp(ffprobeArchivePath, directory){
     const zip = path.join(directory, 'ffprobeArchive');
     const folder = path.join(directory, getHeadDirectory(ffprobeArchivePath));
-    fs.unlinkSync(zip);
-    fs.rmdirSync(folder, {recursive: true});
 
+    //Darwin has ffprobe as the only item, so need to check if folder before removing
+    if(fs.lstatSync(folder).isDirectory()) {
+        fs.rmdirSync(folder, {recursive: true});
+    }
+
+    fs.unlinkSync(zip);
+    
     //sometimes the binary is 2+ folders down so we need to get upper most directory
     function getHeadDirectory(ffPath) {
+
         let prev = ffPath;
-        let itr = 0
         while(ffPath !== '.') {
             prev = ffPath;
             ffPath = path.dirname(ffPath);
