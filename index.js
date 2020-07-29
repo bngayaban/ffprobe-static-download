@@ -1,5 +1,5 @@
 const axios = require('axios');
-const fs = require('fs');
+const {promises:fs, createWriteStream:fsCreateWriteStream} = require('fs');
 const os = require('os');
 const path = require('path');
 const tarxz = require('decompress-tarxz');
@@ -72,7 +72,7 @@ function getUrl(platform, arch) {
 
 // downloads the compressed folder into the respective platform/arch directory
 async function downloadArchive(url, filePath) {
-    const writer = fs.createWriteStream(filePath);
+    const writer = fsCreateWriteStream(filePath);
     const response = await axios({
         url,
         method: 'GET',
@@ -120,11 +120,11 @@ async function cleanUp(ffprobeArchivePath, directory){
     const folder = path.join(directory, getHeadDirectory(ffprobeArchivePath));
 
     //Darwin has ffprobe as the only item, so need to check if folder before removing
-    if(fs.lstatSync(folder).isDirectory()) {
-        fs.rmdirSync(folder, {recursive: true});
+    if((await fs.lstat(folder)).isDirectory()) {
+        await fs.rmdir(folder, {recursive: true});
     }
 
-    fs.unlinkSync(zip);
+    await fs.unlink(zip);
     
     //sometimes the binary is 2+ folders down so we need to get upper most directory
     function getHeadDirectory(ffPath) {
