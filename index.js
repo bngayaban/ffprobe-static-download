@@ -1,4 +1,3 @@
-const axios = require('axios');
 const {promises:fs, createWriteStream:fsCreateWriteStream} = require('fs');
 const os = require('os');
 const path = require('path');
@@ -6,6 +5,7 @@ const tarxz = require('decompress-tarxz');
 const unzip = require('decompress-unzip');
 const decompress = require('decompress');
 const mvdir = require('mvdir');
+const https = require('https');
 
 const platform = os.platform();
 const arch = os.arch();
@@ -43,8 +43,8 @@ async function getFFProbe(platform, arch) {
         await cleanUp(ffprobeArchivePath, platformPath);
         console.log('Done Cleaning');
     } catch (e) {
+        console.error(`FFprobe-static-download:\n`, e);
         console.error(e);
-        console.log(e);
         process.exit();
     }
 }
@@ -53,17 +53,17 @@ async function getFFProbe(platform, arch) {
 function getUrl(platform, arch) {
     const supportedPlatforms = {
         win32: {
-            x64: 'https://ffmpeg.zeranoe.com/builds/win64/static/ffmpeg-4.3.1-win64-static.zip',//'https://ffmpeg.zeranoe.com/builds/win64/static/ffmpeg-latest-win64-static.zip',
-            ia32: 'https://ffmpeg.zeranoe.com/builds/win32/static/ffmpeg-4.3.1-win32-static.zip'//'https://ffmpeg.zeranoe.com/builds/win32/static/ffmpeg-latest-win32-static.zip'
+            x64:    'https://ffmpeg.zeranoe.com/builds/win64/static/ffmpeg-4.3.1-win64-static.zip',//'https://ffmpeg.zeranoe.com/builds/win64/static/ffmpeg-latest-win64-static.zip',
+            ia32:   'https://ffmpeg.zeranoe.com/builds/win32/static/ffmpeg-4.3.1-win32-static.zip'//'https://ffmpeg.zeranoe.com/builds/win32/static/ffmpeg-latest-win32-static.zip'
         },
         linux: {
-            arm: 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-armhf-static.tar.xz',//'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-armhf-static.tar.xz',
-            arm64: 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-arm64-static.tar.xz',//'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-arm64-static.tar.xz',
-            ia32: 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-i686-static.tar.xz',//'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-i686-static.tar.xz',
-            x64: 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz'//'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz',
+            arm:    'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-armhf-static.tar.xz',//'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-armhf-static.tar.xz',
+            arm64:  'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-arm64-static.tar.xz',//'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-arm64-static.tar.xz',
+            ia32:   'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-i686-static.tar.xz',//'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-i686-static.tar.xz',
+            x64:    'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz'//'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz',
         },
         darwin : {
-            x64: 'https://evermeet.cx/ffmpeg/ffprobe-4.3.1.zip',//'https://evermeet.cx/ffmpeg/get/zip',
+            x64:    'https://evermeet.cx/ffmpeg/ffprobe-4.3.1.zip',//'https://evermeet.cx/ffmpeg/get/zip',
         }
     };
 
@@ -71,19 +71,31 @@ function getUrl(platform, arch) {
 }
 
 // downloads the compressed folder into the respective platform/arch directory
-async function downloadArchive(url, filePath) {
-    const writer = fsCreateWriteStream(filePath);
-    const response = await axios({
-        url,
-        method: 'GET',
-        responseType: 'stream'
-    });
-    
-    response.data.pipe(writer);
+// reference: https://stackoverflow.com/questions/11944932/how-to-download-a-file-with-node-js-without-using-third-party-libraries
+function downloadArchive(url, filePath) {
     return new Promise((resolve, reject) => {
-        writer.on('finish', resolve);
-        writer.on('error', reject);
-    })
+        const request = https.get(url, response => {
+            //on successful response, pipe to write stream
+            if(response.statusCode === 200) {
+                const writer = fsCreateWriteStream(filePath);
+                response.pipe(writer);
+                writer.on('finish', () => {
+                    writer.close(resolve);
+                });
+                writer.on('error', err => {
+                    reject(err.message);
+                });
+
+            //otherwise reject and throw error
+            } else {
+                reject(`Server responded with ${response.statusCode}: ${response.statusMessage}`);
+            }
+        });
+    
+        request.on('error', err => {
+            reject(`${err.message}`);
+        });
+    });
 }
 
 // extracts and returns the file path for the ffprobe binary
