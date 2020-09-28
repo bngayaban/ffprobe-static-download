@@ -53,8 +53,7 @@ async function getFFProbe(platform, arch) {
 function getUrl(platform, arch) {
     const supportedPlatforms = {
         win32: {
-            x64:    'https://ffmpeg.zeranoe.com/builds/win64/static/ffmpeg-4.3.1-win64-static.zip',//'https://ffmpeg.zeranoe.com/builds/win64/static/ffmpeg-latest-win64-static.zip',
-            ia32:   'https://ffmpeg.zeranoe.com/builds/win32/static/ffmpeg-4.3.1-win32-static.zip'//'https://ffmpeg.zeranoe.com/builds/win32/static/ffmpeg-latest-win32-static.zip'
+            x64:    'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2020-09-28-12-34/ffmpeg-n4.3.1-18-g6d886b6586-win64-gpl.zip'
         },
         linux: {
             arm:    'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-armhf-static.tar.xz',//'https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-armhf-static.tar.xz',
