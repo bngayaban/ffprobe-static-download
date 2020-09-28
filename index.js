@@ -79,12 +79,15 @@ function downloadArchive(url, filePath) {
                 const writer = fsCreateWriteStream(filePath);
                 response.pipe(writer);
                 writer.on('finish', () => {
-                    writer.close(resolve);
+                    writer.close(resolve());
                 });
                 writer.on('error', err => {
                     reject(err.message);
                 });
 
+            // if redirect code, follow redirect
+            } else if (response.statusCode === 302 || response.statusCode === 301){
+                downloadArchive(response.headers.location, filePath).then(() => resolve());
             //otherwise reject and throw error
             } else {
                 reject(`Server responded with ${response.statusCode}: ${response.statusMessage}`);
